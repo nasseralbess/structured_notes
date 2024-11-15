@@ -6,6 +6,7 @@ import openai
 from dotenv import load_dotenv
 import tempfile
 import os
+from fastapi.websockets import WebSocket
 
 # Load environment variables
 load_dotenv()
@@ -102,6 +103,7 @@ async def transcribe_audio(
 
         return StreamingResponse(chat_stream(), media_type="text/markdown")
     except Exception as e:
+        print(e)
         return JSONResponse({"error": f"Unexpected error: {str(e)}"}, status_code=500)
 
 
