@@ -17,47 +17,26 @@
       <button id="stop-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
         Stop
       </button>
+      <button id="generate-btn"
+              class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
+              hx-post="/test.py/transcribe/"
+              hx-encoding="multipart/form-data"
+              hx-target="#transcription-result">
+        Generate
+      </button>
     </div>
     <div>
       <audio id="recorded-audio" controls class="w-full"></audio>
     </div>
-    <form 
-      hx-post="http://localhost:8000/transcribe/" 
-      hx-encoding="multipart/form-data" 
-      hx-target="#transcription-result"
-      class="mt-4">
-      <div class="mb-4">
-        <label for="note-style" class="block font-medium">Note Style</label>
-        <select id="note-style" name="note_style" class="w-full border-gray-300 rounded p-2">
-          <option value="detailed">Detailed</option>
-          <option value="summary">Summary</option>
-          <option value="bullet">Bullet Points</option>
-        </select>
-      </div>
-      <div class="mb-4">
-        <label for="template-name" class="block font-medium">Template Name</label>
-        <input type="text" id="template-name" name="template_name" class="w-full border-gray-300 rounded p-2" placeholder="Optional">
-      </div>
-      <div class="mb-4">
-        <label for="tags" class="block font-medium">Tags</label>
-        <input type="text" id="tags" name="tags" class="w-full border-gray-300 rounded p-2" placeholder="e.g., lecture, math">
-      </div>
-      <input type="file" id="audio-file" name="file" hidden>
-      <button
-        id="generate-btn"
-        type="submit"
-        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded w-full">
-        Generate
-      </button>
-    </form>
-    <div id="transcription-result" class="mt-4 p-4 bg-gray-50 rounded border"></div>
+    <div id="transcription-result" class="mt-4 whitespace-pre-wrap"></div>
   </div>
 
   <script>
     const recordBtn = document.getElementById('record-btn');
     const stopBtn = document.getElementById('stop-btn');
+    const generateBtn = document.getElementById('generate-btn');
     const recordedAudio = document.getElementById('recorded-audio');
-    const audioFileInput = document.getElementById('audio-file');
+    const transcriptionResult = document.getElementById('transcription-result');
 
     let mediaRecorder;
     let audioChunks = [];
@@ -69,16 +48,9 @@
         audioChunks.push(event.data);
       });
       mediaRecorder.addEventListener('stop', () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+        const audioBlob = new Blob(audioChunks);
         recordedAudio.src = URL.createObjectURL(audioBlob);
         recordedAudio.controls = true;
-
-        // Prepare audio file for submission
-        const file = new File([audioBlob], 'recorded_audio.mp3', { type: 'audio/mp3' });
-        const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(file);
-        audioFileInput.files = dataTransfer.files;
-
         audioChunks = [];
       });
       mediaRecorder.start();
@@ -86,6 +58,13 @@
 
     stopBtn.addEventListener('click', () => {
       mediaRecorder.stop();
+    });
+
+    generateBtn.addEventListener('click', () => {
+      const audioBlob = new Blob(audioChunks);
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recorded_audio.mp3');
+      generateBtn.setAttribute('hx-vals', JSON.stringify({ file: formData }));
     });
   </script>
 </body>
