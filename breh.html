@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Recorder</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://unpkg.com/htmx.org@1.8.5"></script>
+</head>
+<body class="bg-gray-100 p-4">
+  <div class="max-w-md mx-auto bg-white p-6 rounded-lg shadow-md">
+    <h1 class="text-2xl font-bold mb-4">Audio Recorder</h1>
+    <div class="flex justify-between mb-4">
+      <button id="record-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+        Record
+      </button>
+      <button id="stop-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
+        Stop
+      </button>
+      <button id="generate-btn"
+        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
+        hx-post="/test.py/transcribe/"
+        hx-encoding="multipart/form-data"
+        hx-target="#transcription-result">
+        Generate
+      </button>
+    </div>
+    <div>
+      <audio id="recorded-audio" controls class="w-full"></audio>
+    </div>
+    <div id="transcription-result"></div>
+  </div>
+
+  <script>
+    const recordBtn = document.getElementById('record-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const generateBtn = document.getElementById('generate-btn');
+    const recordedAudio = document.getElementById('recorded-audio');
+
+    let mediaRecorder;
+    let audioChunks = [];
+
+    recordBtn.addEventListener('click', async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.addEventListener('dataavailable', (event) => {
+        audioChunks.push(event.data);
+      });
+      mediaRecorder.addEventListener('stop', () => {
+        const audioBlob = new Blob(audioChunks);
+        recordedAudio.src = URL.createObjectURL(audioBlob);
+        recordedAudio.controls = true;
+        audioChunks = [];
+      });
+      mediaRecorder.start();
+    });
+
+    stopBtn.addEventListener('click', () => {
+      mediaRecorder.stop();
+    });
+
+    generateBtn.addEventListener('click', () => {
+      const audioBlob = new Blob(audioChunks);
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recorded_audio.mp3');
+      generateBtn.setAttribute('hx-vals', JSON.stringify({ file: formData }));
+    });
+  </script>
+</body>
+</html>
