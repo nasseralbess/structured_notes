@@ -18,17 +18,17 @@
         Stop
       </button>
       <button id="generate-btn"
-        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
-        hx-post="/test.py/transcribe/"
-        hx-encoding="multipart/form-data"
-        hx-target="#transcription-result">
+              class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
+              hx-post="/transcribe/"
+              hx-encoding="multipart/form-data"
+              hx-target="#transcription-result">
         Generate
       </button>
     </div>
     <div>
       <audio id="recorded-audio" controls class="w-full"></audio>
     </div>
-    <div id="transcription-result"></div>
+    <div id="transcription-result" class="mt-4 whitespace-pre-wrap"></div>
   </div>
 
   <script>
@@ -36,6 +36,7 @@
     const stopBtn = document.getElementById('stop-btn');
     const generateBtn = document.getElementById('generate-btn');
     const recordedAudio = document.getElementById('recorded-audio');
+    const transcriptionResult = document.getElementById('transcription-result');
 
     let mediaRecorder;
     let audioChunks = [];
