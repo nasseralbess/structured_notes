@@ -1,11 +1,234 @@
-<html>
-    <script type="module" src="https://md-block.verou.me/md-block.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Recorder and Markdown Renderer</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/katex.min.js"></script>
+  <!-- Use Marked v4 which doesn't have the deprecation warnings -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+  <style>
+    .markdown-content {
+      display: block;
+      margin: 1rem 0;
+    }
+    
+    .markdown-content table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+    }
+    
+    .markdown-content th,
+    .markdown-content td {
+      border: 1px solid #e2e8f0;
+      padding: 0.5rem 1rem;
+      text-align: left;
+    }
+    
+    .markdown-content ul {
+      list-style-type: disc;
+      margin-left: 1.5rem;
+    }
+    
+    .markdown-content ul ul {
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .markdown-content code {
+      background-color: #f7fafc;
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.25rem;
+      font-family: monospace;
+    }
+    
+    .markdown-content pre {
+      background-color: #f7fafc;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
 
-    <head>...</head>
- 
-    <body>
-        <md-block>
-# Lecture Notes on Multilingual Understanding & Mathematical Concepts
+    .katex-display {
+      margin: 1rem 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .math-inline {
+      display: inline-block;
+      margin: 0 0.2em;
+    }
+    
+    .math-display {
+      display: block;
+      margin: 1em 0;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 p-8">
+  <div class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-lg">
+    <h1 class="text-3xl font-bold mb-6">Audio Recorder & Markdown Renderer</h1>
+    
+    <div class="flex justify-between mb-6">
+      <button id="record-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+        Record
+      </button>
+      <button id="stop-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
+        Stop
+      </button>
+    </div>
+    
+    <audio id="recorded-audio" controls class="w-full mb-6"></audio>
+    
+    <form 
+      hx-post="http://localhost:8000/transcribe/" 
+      hx-encoding="multipart/form-data" 
+      hx-target="#raw-transcription-result"
+      hx-trigger="submit"
+      class="mb-6">
+      
+      <div class="mb-4">
+        <label for="note-style" class="block font-medium">Note Style</label>
+        <select id="note-style" name="note_style" class="w-full border border-gray-300 rounded p-2">
+          <option value="detailed">Detailed</option>
+          <option value="summary">Summary</option>
+          <option value="bullet">Bullet Points</option>
+        </select>
+      </div>
+      
+      <div class="mb-4">
+        <label for="template-name" class="block font-medium">Template Name</label>
+        <input type="text" id="template-name" name="template_name" class="w-full border border-gray-300 rounded p-2" placeholder="Optional">
+      </div>
+      
+      <div class="mb-4">
+        <label for="tags" class="block font-medium">Tags</label>
+        <input type="text" id="tags" name="tags" class="w-full border border-gray-300 rounded p-2" placeholder="e.g., lecture, math">
+      </div>
+      
+      <input type="file" id="audio-file" name="file" hidden>
+      
+      <button
+        id="generate-btn"
+        type="submit"
+        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded w-full">
+        Generate
+      </button>
+    </form>
+    
+    <div id="raw-transcription-result" class="hidden"></div>
+    <div id="markdown-container" class="markdown-content"></div>
+    
+    <button id="test-markdown" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded mt-4">
+      Test Markdown
+    </button>
+  </div>
+
+  <script type="module">
+    import 'https://unpkg.com/htmx.org@1.8.5/dist/htmx.min.js';
+
+    // Configure marked options
+    marked.setOptions({
+      gfm: true,
+      breaks: true,
+      pedantic: false,
+      sanitize: false,
+      smartLists: true
+    });
+
+    // Wait for KaTeX to load
+    function waitForKaTeX() {
+      return new Promise((resolve) => {
+        if (window.katex) {
+          resolve();
+        } else {
+          setTimeout(() => waitForKaTeX().then(resolve), 100);
+        }
+      });
+    }
+
+    // Function to safely render KaTeX
+    function renderKaTeX(tex, displayMode = false) {
+      try {
+        return window.katex.renderToString(tex.trim(), {
+          displayMode: displayMode,
+          throwOnError: false,
+          strict: false,
+          trust: true,
+          output: 'html',
+          macros: {
+            "\\eq": "=",
+            "\\neq": "\\not="
+          }
+        });
+      } catch (error) {
+        console.error('KaTeX error:', error);
+        console.error('Equation:', tex);
+        return tex;
+      }
+    }
+
+    // Function to process markdown with math
+    async function processMarkdown(markdown) {
+      await waitForKaTeX();
+
+      let processed = markdown;
+      
+      // Create temporary placeholders for code blocks
+      const codeBlocks = [];
+      processed = processed.replace(/```[\s\S]*?```/g, (match) => {
+        codeBlocks.push(match);
+        return `CODE_BLOCK_${codeBlocks.length - 1}`;
+      });
+
+      // Process display math first
+      processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
+        const rendered = renderKaTeX(tex, true);
+        return `<div class="math-display">${rendered}</div>`;
+      });
+
+      // Process \[...\] display math
+      processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, (_, tex) => {
+        const rendered = renderKaTeX(tex, true);
+        return `<div class="math-display">${rendered}</div>`;
+      });
+
+      // Process inline math
+      processed = processed.replace(/\\\((.*?)\\\)/g, (_, tex) => {
+        const rendered = renderKaTeX(tex, false);
+        return `<span class="math-inline">${rendered}</span>`;
+      });
+
+      // Process $...$ inline math (not preceded or followed by another $)
+      processed = processed.replace(/(?<!\$)\$(?!\$)(.*?)(?<!\$)\$(?!\$)/g, (_, tex) => {
+        const rendered = renderKaTeX(tex, false);
+        return `<span class="math-inline">${rendered}</span>`;
+      });
+
+      // Restore code blocks
+      processed = processed.replace(/CODE_BLOCK_(\d+)/g, (_, index) => codeBlocks[index]);
+
+      // Convert to HTML using marked
+      return marked.parse(processed);
+    }
+
+    // Function to render markdown content
+    async function renderMarkdown(content) {
+      const processedContent = await processMarkdown(content);
+      const markdownContainer = document.getElementById('markdown-container');
+      markdownContainer.innerHTML = processedContent;
+    }
+
+    // Test function
+    async function testFormulaRendering() {
+      const testMarkdown = `
+      # Lecture Notes on Multilingual Understanding & Mathematical Concepts
 
 ## Introduction
 The lecture explores the importance of understanding multiple languages in an educational context, especially in lectures that incorporate different languages. Additionally, it touches upon a mathematical concept using trigonometric functions.
@@ -16,31 +239,31 @@ The lecture explores the importance of understanding multiple languages in an ed
 
 ### 1. Multilingual Understanding in Education
 - **Importance of Bilingual Proficiency**:
-    - Understanding both English and Arabic (or any other combination of languages) is essential in diverse educational settings.
-    - The ability to comprehend lectures given in multiple languages enhances learning and engagement.
+  - Understanding both English and Arabic (or any other combination of languages) is essential in diverse educational settings.
+  - The ability to comprehend lectures given in multiple languages enhances learning and engagement.
 
 - **Common Practices**:
-    - Many academic environments feature lectures that may mix languages.
-    - Professors may deliver content in one language while using terms or examples in another to accommodate different student backgrounds.
+  - Many academic environments feature lectures that may mix languages.
+  - Professors may deliver content in one language while using terms or examples in another to accommodate different student backgrounds.
 
 ### 2. Mathematical Concepts
 - **Trigonometric Functions**:
-    - The function cited in the lecture: 
+  - The function cited in the lecture: 
     \[
     \sin(x) \neq \cos(x)
     \]
-    - This equation sets the premise for a broader discussion on equality and mathematical reasoning.
+  - This equation sets the premise for a broader discussion on equality and mathematical reasoning.
 
 - **Cubic and Square Relationships**:
-    - The statement concerning \(x^2\) and \(x^3\):
+  - The statement concerning \(x^2\) and \(x^3\):
     - **Key Observations**:
-        - \(x^2\) (square of x) does not equate to \(x^3\) (cube of x) for all values of \(x\).
-        - This highlights different properties of exponents in mathematics.
+      - \(x^2\) (square of x) does not equate to \(x^3\) (cube of x) for all values of \(x\).
+      - This highlights different properties of exponents in mathematics.
 
 ### 3. The Nature of Mathematical Proofs
 - **Understanding Equalities**:
-    - Exploring why certain functions or equations may not hold true.
-    - Emphasizes logical reasoning in mathematics:
+  - Exploring why certain functions or equations may not hold true.
+  - Emphasizes logical reasoning in mathematics:
     - Example: If \(x\) is squared, then it cannot equal the cube unless specific conditions (like \(x=0\) or \(x=1\)) are met.
 
 ---
@@ -62,6 +285,64 @@ The lecture explores the importance of understanding multiple languages in an ed
 
 ## Conclusion
 This lecture exemplifies not only the necessity for multilingual skills in education but also illustrates how mathematical principles can be integrated into discussions on language and comprehension. Understanding these concepts encourages critical thinking and enhances overall academic experience.
-        </md-block>
-    </body>
+`;
+
+      await renderMarkdown(testMarkdown);
+    }
+
+    // Audio recording functionality
+    let mediaRecorder;
+    let audioChunks = [];
+    const recordBtn = document.getElementById('record-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const recordedAudio = document.getElementById('recorded-audio');
+    const audioFileInput = document.getElementById('audio-file');
+
+    if (recordBtn && stopBtn) {
+      recordBtn.addEventListener('click', async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          mediaRecorder.addEventListener('dataavailable', (event) => {
+            audioChunks.push(event.data);
+          });
+          mediaRecorder.addEventListener('stop', () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+            recordedAudio.src = URL.createObjectURL(audioBlob);
+            recordedAudio.controls = true;
+
+            const file = new File([audioBlob], 'recorded_audio.mp3', { type: 'audio/mp3' });
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            audioFileInput.files = dataTransfer.files;
+
+            audioChunks = [];
+          });
+          mediaRecorder.start();
+        } catch (error) {
+          console.error('Error accessing microphone:', error);
+        }
+      });
+
+      stopBtn.addEventListener('click', () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+        }
+      });
+    }
+
+    // Set up event listeners
+    document.getElementById('test-markdown')?.addEventListener('click', testFormulaRendering);
+
+    // Handle transcription results
+    document.addEventListener('htmx:afterSettle', async (event) => {
+      if (event.target.id === 'raw-transcription-result') {
+        const rawText = event.target.textContent.trim();
+        if (rawText) {
+          await renderMarkdown(rawText);
+        }
+      }
+    });
+  </script>
+</body>
 </html>

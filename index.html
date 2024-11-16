@@ -3,101 +3,147 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Audio Recorder</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
-  <script src="https://unpkg.com/htmx.org@1.8.5"></script>
+  <title>Audio Recorder & Markdown Renderer</title>
   <script type="module" src="https://md-block.verou.me/md-block.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    /* Enhanced styling for md-block elements */
+    md-block {
+      display: block;
+      margin: 1rem 0;
+      border-left: 4px solid #2563eb;
+      padding-left: 1rem;
+    }
+
+    md-block table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1rem;
+    }
+
+    md-block th,
+    md-block td {
+      border: 1px solid #e2e8f0;
+      padding: 0.5rem;
+      text-align: left;
+    }
+
+    md-block pre {
+      background: #1e293b;
+      color: #cbd5e1;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 p-4">
-  <div class="max-w-md mx-auto bg-white p-6 rounded-lg shadow-md">
-    <h1 class="text-2xl font-bold mb-4">Audio Recorder</h1>
-    <div class="flex justify-between mb-4">
-      <button id="record-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+<body class="bg-gray-900 text-gray-200 min-h-screen flex items-center justify-center">
+  <div class="container mx-auto px-6 py-12 max-w-4xl bg-gray-800 rounded-lg shadow-lg">
+    <h1 class="text-4xl font-bold mb-6 text-blue-400">Audio Recorder & Markdown Renderer</h1>
+    
+    <div class="flex justify-between mb-8">
+      <button id="record-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-6 rounded shadow-md">
         Record
       </button>
-      <button id="stop-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
+      <button id="stop-btn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded shadow-md">
         Stop
       </button>
     </div>
-    <div>
-      <audio id="recorded-audio" controls class="w-full"></audio>
-    </div>
+    
+    <audio id="recorded-audio" controls class="w-full mb-8 bg-gray-700 rounded"></audio>
+    
     <form 
       hx-post="http://localhost:8000/transcribe/" 
       hx-encoding="multipart/form-data" 
       hx-target="#raw-transcription-result"
-      hx-trigger="submit"
-      class="mt-4">
-      <div class="mb-4">
-        <label for="note-style" class="block font-medium">Note Style</label>
-        <select id="note-style" name="note_style" class="w-full border-gray-300 rounded p-2">
-          <option value="detailed">Detailed</option>
-          <option value="summary">Summary</option>
-          <option value="bullet">Bullet Points</option>
-        </select>
+      hx-trigger="submit">
+      
+      <div class="space-y-6">
+        <div>
+          <label for="note-style" class="block font-medium text-gray-300">Note Style</label>
+          <select id="note-style" name="note_style" class="w-full border border-gray-600 bg-gray-700 rounded py-2 px-3">
+            <option value="detailed">Detailed</option>
+            <option value="summary">Summary</option>
+            <option value="bullet">Bullet Points</option>
+          </select>
+        </div>
+        
+        <div>
+          <label for="template-name" class="block font-medium text-gray-300">Template Name</label>
+          <input type="text" id="template-name" name="template_name" class="w-full border border-gray-600 bg-gray-700 rounded py-2 px-3" placeholder="Optional">
+        </div>
+        
+        <div>
+          <label for="tags" class="block font-medium text-gray-300">Tags</label>
+          <input type="text" id="tags" name="tags" class="w-full border border-gray-600 bg-gray-700 rounded py-2 px-3" placeholder="e.g., lecture, math">
+        </div>
       </div>
-      <div class="mb-4">
-        <label for="template-name" class="block font-medium">Template Name</label>
-        <input type="text" id="template-name" name="template_name" class="w-full border-gray-300 rounded p-2" placeholder="Optional">
-      </div>
-      <div class="mb-4">
-        <label for="tags" class="block font-medium">Tags</label>
-        <input type="text" id="tags" name="tags" class="w-full border-gray-300 rounded p-2" placeholder="e.g., lecture, math">
-      </div>
+      
       <input type="file" id="audio-file" name="file" hidden>
+      
       <button
         id="generate-btn"
         type="submit"
-        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded w-full">
+        class="mt-8 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded shadow-md w-full">
         Generate
       </button>
     </form>
-    <div id="raw-transcription-result" class="hidden"></div>
-    <md-block id="transcription-result" class="mt-4 p-4 bg-gray-50 rounded border"></md-block>
+    
+    <div id="raw-transcription-result" class="hidden mt-8"></div>
+    <div id="markdown-container" class="mt-8"></div>
   </div>
 
-  <script>
+  <script type="module">
+    import 'https://unpkg.com/htmx.org@1.8.5/dist/htmx.min.js';
+
     const recordBtn = document.getElementById('record-btn');
     const stopBtn = document.getElementById('stop-btn');
     const recordedAudio = document.getElementById('recorded-audio');
     const audioFileInput = document.getElementById('audio-file');
     const rawTranscriptionResult = document.getElementById('raw-transcription-result');
-    const transcriptionResult = document.getElementById('transcription-result');
+    const markdownContainer = document.getElementById('markdown-container');
 
     let mediaRecorder;
     let audioChunks = [];
 
     recordBtn.addEventListener('click', async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      mediaRecorder.addEventListener('dataavailable', (event) => {
-        audioChunks.push(event.data);
-      });
-      mediaRecorder.addEventListener('stop', () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
-        recordedAudio.src = URL.createObjectURL(audioBlob);
-        recordedAudio.controls = true;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.addEventListener('dataavailable', (event) => audioChunks.push(event.data));
+        mediaRecorder.addEventListener('stop', () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+          recordedAudio.src = URL.createObjectURL(audioBlob);
+          recordedAudio.controls = true;
 
-        // Prepare audio file for submission
-        const file = new File([audioBlob], 'recorded_audio.mp3', { type: 'audio/mp3' });
-        const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(file);
-        audioFileInput.files = dataTransfer.files;
+          const file = new File([audioBlob], 'recorded_audio.mp3', { type: 'audio/mp3' });
+          const dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+          audioFileInput.files = dataTransfer.files;
 
-        audioChunks = [];
-      });
-      mediaRecorder.start();
+          audioChunks = [];
+        });
+        mediaRecorder.start();
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+      }
     });
 
     stopBtn.addEventListener('click', () => {
-      mediaRecorder.stop();
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
     });
 
-    // Listen for updates to the raw transcription result and set the markdown content
     document.addEventListener('htmx:afterSettle', (event) => {
       if (event.target.id === 'raw-transcription-result') {
         const rawText = rawTranscriptionResult.textContent.trim();
-        transcriptionResult.textContent = rawText; // md-block will automatically render the Markdown
+        if (rawText) {
+          const mdBlock = document.createElement('md-block');
+          mdBlock.innerHTML = rawText;
+          markdownContainer.innerHTML = '';
+          markdownContainer.appendChild(mdBlock);
+        }
       }
     });
   </script>
