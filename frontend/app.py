@@ -28,6 +28,16 @@ class NotesApp:
             layout="wide",
             initial_sidebar_state="expanded"
         )
+        st.markdown(
+            """
+            <style>
+            button, [role="button"], .stButton button, select, .stSelectbox div {
+                cursor: pointer !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
         self.setup_sidebar()
         
     def setup_sidebar(self):
