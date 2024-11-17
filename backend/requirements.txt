@@ -4,5 +4,4 @@ python-multipart
 openai
 python-dotenv
 pydantic
-sqlite3
 uvicorn
