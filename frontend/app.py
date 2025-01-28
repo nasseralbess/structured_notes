@@ -11,7 +11,7 @@ API_BASE_URL = "http://localhost:8000"
 
 # Initialize session state
 if 'current_note' not in st.session_state:
-    st.session_state.current_note = None
+    st.session_state.current_note = None 
 if 'quiz_active' not in st.session_state:
     st.session_state.quiz_active = False
 if 'quiz_answers' not in st.session_state:
@@ -183,7 +183,7 @@ class NotesApp:
                         if st.button("Take Quiz"):
                             st.session_state.current_note = note_data
                             st.session_state.quiz_active = True
-                            st.experimental_rerun()
+                            st.rerun()
                     else:
                         st.error(f"Failed to transcribe audio: {response.text}")
             except requests.exceptions.RequestException as e:
@@ -257,7 +257,7 @@ class NotesApp:
                             if st.button("Take Quiz", key=f"quiz_{note['id']}"):
                                 st.session_state.current_note = note
                                 st.session_state.page = "Take Quiz"  
-                                st.experimental_rerun()
+                                st.rerun()
                         
                         with col2b:
                             st.download_button(
@@ -280,7 +280,7 @@ class NotesApp:
             st.warning("Please select a note from the 'View Notes' page to take a quiz.")
             if st.button("Go to View Notes"):
                 self.page = "View Notes"
-                st.experimental_rerun()
+                st.rerun()
             return
         
         note = st.session_state.current_note
@@ -340,13 +340,13 @@ class NotesApp:
             with col1:
                 if st.button("Submit Answers", disabled=st.session_state.quiz_submitted):
                     st.session_state.quiz_submitted = True
-                    st.experimental_rerun()
+                    st.rerun()
             
             with col2:
                 if st.button("Reset Quiz"):
                     st.session_state.quiz_submitted = False
                     st.session_state.quiz_answers = {}
-                    st.experimental_rerun()
+                    st.rerun()
             
             # Show score if submitted
             if st.session_state.quiz_submitted:

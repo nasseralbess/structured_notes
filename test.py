@@ -55,7 +55,7 @@ async def transcribe_audio(file: UploadFile):
 
         # Generate the structured notes
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
         )
 
